@@ -31,6 +31,20 @@ torch-sparse==0.6.9
 transformers==3.2.0
 ```
 
+### Preparation 
+
+#### Stylistic Tokens & Entities Recognition
+
+#### Heterogeneous Graph Initialization
+
+#### Preparation of the Fact-based Models
+
+##### Tokenize
+
+##### Retrieve by BM25
+
+### Training and Inferring
+
 ## Citation
 
 ```
