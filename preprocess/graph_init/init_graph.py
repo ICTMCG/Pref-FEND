@@ -125,7 +125,8 @@ if __name__ == '__main__':
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 
-    bert_token_embeddings = torch.load('../tokenize/data/{}/BertTokenEmbedding.pt'.format(dataset))
+    bert_token_embeddings = torch.load(
+        '../tokenize/data/{}/BertTokenEmbedding.pt'.format(dataset))
     print('Bert Embeddings: \n{}\n'.format(bert_token_embeddings))
 
     for dataset_type in ['train', 'val', 'test']:
@@ -137,23 +138,23 @@ if __name__ == '__main__':
             graph_file, len(graphs)))
 
         # ======== Init Graph Data ========
-        nodes_features = dict()
-        edges2entity = dict()
-        edges2pattern = dict()
-        edges2others = dict()
-        type2nidxs = dict()
+        dataset_nodes_features = dict()
+        dataset_edges2entity = dict()
+        dataset_edges2pattern = dict()
+        dataset_edges2others = dict()
+        dataset_type2nidxs = dict()
 
         for idx, g in enumerate(tqdm(graphs)):
             nodes, edges2entity, edges2pattern, edges2others, type2nidxs = parse_graph(
                 g)
-            nodes_features[idx] = nodes
-            edges2entity[idx] = edges2entity
-            edges2pattern[idx] = edges2pattern
-            edges2others[idx] = edges2others
-            type2nidxs[idx] = type2nidxs
+            dataset_nodes_features[idx] = nodes
+            dataset_edges2entity[idx] = edges2entity
+            dataset_edges2pattern[idx] = edges2pattern
+            dataset_edges2others[idx] = edges2others
+            dataset_type2nidxs[idx] = type2nidxs
 
         graph_data_file = 'data/{}/graph_max_nodes_{}_{}.pkl'.format(
             dataset, max_nodes, dataset_type)
         with open(graph_data_file, 'wb') as f:
-            pickle.dump([nodes_features, edges2entity,
-                         edges2pattern, edges2others, type2nidxs], f)
+            pickle.dump([dataset_nodes_features, dataset_edges2entity,
+                         dataset_edges2pattern, dataset_edges2others, dataset_type2nidxs], f)

@@ -5,8 +5,6 @@ import pickle
 import os
 from transformers import BertTokenizer
 
-tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
-
 
 def get_bert_tokens(text):
     return tokenizer.encode(text, add_special_tokens=False)
@@ -19,6 +17,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dataset = args.dataset
+    tokenizer = BertTokenizer.from_pretrained(args.pretrained_model)
 
     save_dir = 'data'
     if not os.path.exists(save_dir):

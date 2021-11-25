@@ -8,3 +8,5 @@
 *.pkl
 *.json
 *.out
+
+model/playground.ipynb
