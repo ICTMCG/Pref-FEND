@@ -35,7 +35,7 @@ def eval_when_training_on_single_gpu(outputs_file, dataset):
 
         if ans != pred:
             case = {'idx': idx, 'label': INDEX2LABEL[ans],
-                    'prediction': pred, 'prediction_scores': list(scores)}
+                    'prediction': INDEX2LABEL[pred], 'prediction_scores': list(scores)}
             wrong_cls_cases.append(case)
 
         classifying_ans = np.append(classifying_ans, ans)

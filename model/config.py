@@ -76,7 +76,7 @@ parser.add_argument('--eann_input_dim', type=int, default=768)
 parser.add_argument('--eann_hidden_dim', type=int, default=64)
 parser.add_argument('--eann_event_num', type=int, default=300)
 parser.add_argument('--eann_use_textcnn', type=bool, default=True)
-parser.add_argument('--eann_weight_of_event_loss', type=float, default=-1.0)
+parser.add_argument('--eann_weight_of_event_loss', type=float, default=1.0)
 
 
 # --- BERT_Emo ---

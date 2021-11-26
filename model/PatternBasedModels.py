@@ -247,26 +247,28 @@ class EANN_Text(nn.Module):
             # nn.Softmax(dim=1)
         )
 
-    def forward_EANN(self, text, mask, maps=None):
-        # text -> [batch_size, text_len, embedding_size]
-        # mask -> [batch_size, text_len, 1] (If using pref map, the mask will be in [0,1] and the padding tokens are 0, else the entries are 0/1)
-        # Textual Feature Extraction
+    def forward(self, idxs, dataset, tokens_features, maps=None):
+        # tokens_features: (batch_size, max_nodes, 768)
+        # masks: (batch_size, max_nodes)
+        # maps: (batch_size, max_nodes) or None
+
+        tokens_features, masks = tokens_features
 
         if maps is None:
-            text = text * mask
+            text = tokens_features * masks[:, :, None]
         else:
-            # maps: (batch_size, text_len, 1)
-            text = text * maps
+            text = tokens_features * maps[:, :, None]
 
-        # [batch_size, 1, text_len, embedding_size]
+        # (batch_size, 1, max_nodes, 768)
         text = text.unsqueeze(1)
-        # [batch_size, filter_num, feature_len] * len(window_sizes)
+        # (batch_size, filter_num, feature_len) * len(window_sizes)
         text = [F.relu(conv(text)).squeeze(3) for conv in self.convs]
-        # [batch_size, filter_num] * len(window_sizes)
+        # (batch_size, filter_num) * len(window_sizes)
         text = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in text]
-        # [batch_size, filter_num * len(window_sizes)]
+        # (batch_size, filter_num * len(window_sizes)
         text = torch.cat(text, 1)
-        text = F.relu(self.fc_cnn(text))  # [batch_size, hidden_dim]
+        # (batch_size, hidden_dim)
+        text = F.relu(self.fc_cnn(text))
 
         # Fake News Detection: (batch_size, output_dim)
         detector_output = self.fake_news_detector(text)
@@ -276,36 +278,6 @@ class EANN_Text(nn.Module):
         discriminator_output = self.event_discriminator(reverse_text_feature)
 
         return detector_output, discriminator_output
-
-    def forward(self, idxs, dataset, tokens_features, maps=None):
-        # tokens_features:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, input_dim) tensor.
-        # maps:
-        #   type is list (or None), the size is batch_size. Each elem is a (num_tokens) tensor.
-
-        tokens_features, masks = self._padding(tokens_features)
-        if maps is not None:
-            maps, _ = self._padding([m[:, None] for m in maps])
-
-        return self.forward_EANN(text=tokens_features, mask=masks, maps=maps)
-
-    def _padding(self, t):
-        # t:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, dim) tensor.
-        # Return:
-        #   a (batch_size, max_sequence_length, dim) tensor
-
-        dim = t[0].shape[-1]
-        padded_t = torch.zeros(
-            (len(t), self.max_sequence_length, dim), device=self.args.device)
-        mask = torch.zeros(
-            (len(t), self.max_sequence_length, 1), device=self.args.device)
-        for i, x in enumerate(t):
-            sz = min(len(x), self.max_sequence_length)
-            padded_t[i, :sz] = x[:sz]
-            mask[i, :sz] = 1 / (sz + ZERO)
-
-        return padded_t, mask
 
 
 class GRL(Function):

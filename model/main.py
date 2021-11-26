@@ -28,6 +28,10 @@ if __name__ == "__main__":
     if args.debug:
         args.save = './ckpts/debug'
         args.epochs = 2
+    if not args.use_preference_map:
+        args.weight_of_normal_loss = 1.0
+        args.weight_of_preference_loss = .0
+        args.weight_of_reversed_loss = .0
 
     if os.path.exists(args.save):
         os.system('rm -r {}'.format(args.save))
@@ -83,6 +87,7 @@ if __name__ == "__main__":
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
+        shuffle=True,
         num_workers=8,
         pin_memory=(torch.cuda.is_available()),
         drop_last=False,
@@ -167,7 +172,8 @@ if __name__ == "__main__":
                     # sim_matrix: (batch_size, batch_size)
                     sim_matrix = pytorch_cos_sim(map_entity, map_pattern)
                     # fill NAN
-                    sim_matrix = sim_matrix.masked_fill(torch.isnan(sim_matrix), 0.)
+                    sim_matrix = sim_matrix.masked_fill(
+                        torch.isnan(sim_matrix), 0.)
                     preference_loss = torch.mean(torch.diag(sim_matrix))
 
                 if args.pattern_based_model == 'EANN_Text':

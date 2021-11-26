@@ -55,15 +55,15 @@ class GraphDataset(Dataset):
         #     print('Done, the shape is {}, it took {:.2}s\n'.format(
         #         self.BERT_Emo_features.shape, time.time() - t))
 
-        # === TODO: EANN_Text ===
-        # if args.pattern_based_model == 'EANN_Text':
-        #     t = time.time()
-        #     print('\nLoading Event data...')
-        #     event_label_file = os.path.join(
-        #         PROJECT_DIR, 'Baselines/EANN_Text/data', experimental_dataset, '{}_event_labels.npy'.format(dataset_type))
-        #     self.event_labels = np.load(event_label_file).tolist()
-        #     print('Done, the size is {}, it took {:.2}s\n'.format(
-        #         len(self.event_labels), time.time() - t))
+        # === EANN_Text ===
+        if args.pattern_based_model == 'EANN_Text':
+            t = time.time()
+            print('\nLoading Event data...')
+            event_label_file = '../preprocess/EANN_Text/data/{}/{}_event_labels.npy'.format(
+                experimental_dataset, dataset_type)
+            self.event_labels = np.load(event_label_file).tolist()
+            print('Done, the size is {}, it took {:.2}s\n'.format(
+                len(self.event_labels), time.time() - t))
 
     def init_graph_data(self, graph_data_file):
         with open(graph_data_file, 'rb') as f:

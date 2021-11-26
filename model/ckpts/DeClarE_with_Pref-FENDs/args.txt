@@ -1,16 +1,16 @@
 dataset	Weibo
 category_num	2
-save	ckpts/BiLSTM_with_Pref-FENDs
+save	ckpts/DeClarE_with_Pref-FENDs
 use_preference_map	True
-use_pattern_based_model	True
-use_fact_based_model	False
+use_pattern_based_model	False
+use_fact_based_model	True
 num_gnn_layers	2
 dim_node_features	768
 updated_weights_for_A	0.5
-pattern_based_model	BiLSTM
-fact_based_model	
-output_dim_of_pattern_based_model	256
-output_dim_of_fact_based_model	0
+pattern_based_model	
+fact_based_model	DeClarE
+output_dim_of_pattern_based_model	0
+output_dim_of_fact_based_model	256
 num_mlp_layers	3
 weight_of_normal_loss	2.0
 weight_of_preference_loss	1.0
@@ -54,9 +54,9 @@ declare_hidden_dim	128
 declare_max_doc_length	200
 declare_bilstm_num_layer	1
 declare_bilstm_dropout	0
-lr	5e-05
+lr	0.001
 epochs	50
-batch_size	4
+batch_size	8
 start_epoch	0
 resume	
 evaluate	False
@@ -67,8 +67,11 @@ fp16	True
 local_rank	-1
 
 PrefFEND(
-  (PatternBasedModel): BiLSTM(
-    (lstm): LSTM(768, 128, batch_first=True, bidirectional=True)
+  (FactBasedModel): DeClarE(
+    (post_bilstm): LSTM(768, 128, batch_first=True, bidirectional=True)
+    (articles_bilstm): LSTM(768, 128, batch_first=True, bidirectional=True)
+    (Wa): Linear(in_features=512, out_features=1, bias=True)
+    (Wc): Linear(in_features=256, out_features=256, bias=True)
     (fc): Linear(in_features=256, out_features=256, bias=True)
   )
   (fcs): ModuleList(

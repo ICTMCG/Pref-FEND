@@ -54,7 +54,7 @@ declare_hidden_dim	128
 declare_max_doc_length	200
 declare_bilstm_num_layer	1
 declare_bilstm_dropout	0
-lr	0.0001
+lr	5e-05
 epochs	50
 batch_size	8
 start_epoch	0
