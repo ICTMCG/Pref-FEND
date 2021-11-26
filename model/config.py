@@ -40,7 +40,8 @@ parser.add_argument('--use_fact_based_model', type=str2bool, default=True)
 # --- HetDGCN ---
 parser.add_argument('--num_gnn_layers', type=int, default=2)
 parser.add_argument('--dim_node_features', type=int, default=768)
-parser.add_argument('--updated_weights_for_A', type=float, default=0.5, help='1 - alpha')
+parser.add_argument('--updated_weights_for_A', type=float,
+                    default=0.5, help='1 - alpha')
 
 # --- Pattern- and Fact-based Models ---
 parser.add_argument('--pattern_based_model', type=str,
@@ -55,9 +56,12 @@ parser.add_argument('--output_dim_of_fact_based_model', type=int, default=256)
 parser.add_argument('--num_mlp_layers', type=int, default=3)
 
 # --- Loss ---
-parser.add_argument('--weight_of_normal_loss', type=float, default=2.0, help='beta1')
-parser.add_argument('--weight_of_preference_loss', type=float, default=1.0, help='beta2')
-parser.add_argument('--weight_of_reversed_loss', type=float, default=1.0, help='beta3')
+parser.add_argument('--weight_of_normal_loss',
+                    type=float, default=2.0, help='beta1')
+parser.add_argument('--weight_of_preference_loss',
+                    type=float, default=1.0, help='beta2')
+parser.add_argument('--weight_of_reversed_loss',
+                    type=float, default=1.0, help='beta3')
 
 # ======================== Pattern-based Models ========================
 
@@ -80,10 +84,7 @@ parser.add_argument('--eann_weight_of_event_loss', type=float, default=1.0)
 
 
 # --- BERT_Emo ---
-parser.add_argument('--bert_pretrained_model_chinese',
-                    type=str, default='bert-base-chinese')
-parser.add_argument('--bert_pretrained_model_english',
-                    type=str, default='bert-base-uncased')
+parser.add_argument('--bert_pretrained_model', type=str)
 parser.add_argument('--bert_input_max_sequence_length',
                     type=int, default=MAX_TOKENS_OF_A_POST)
 parser.add_argument('--bert_training_embedding_layers',
@@ -113,7 +114,8 @@ parser.add_argument('--evin_input_max_sequence_length',
 parser.add_argument('--evin_max_doc_length', type=int,
                     default=MAX_TOKENS_OF_A_DOC)
 parser.add_argument('--evin_input_dim', type=int, default=768)
-parser.add_argument('--evin_hidden_dim', type=int, default=60, help='hidden_dim * 2 % nhead = 0')
+parser.add_argument('--evin_hidden_dim', type=int,
+                    default=60, help='hidden_dim * 2 % nhead = 0')
 parser.add_argument('--evin_dropout_att', type=float, default=0.5)
 parser.add_argument('--evin_dropout_mlp', type=float, default=0.6)
 parser.add_argument('--evin_nhead', type=int, default=6)

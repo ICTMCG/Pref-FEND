@@ -80,9 +80,9 @@ if __name__ == "__main__":
     val_dataset = GraphDataset(args, 'val')
     test_dataset = GraphDataset(args, 'test')
 
-    train_sampler = RandomSampler(train_dataset)
-    val_sampler = SequentialSampler(val_dataset)
-    test_sampler = SequentialSampler(test_dataset)
+    # train_sampler = RandomSampler(train_dataset)
+    # val_sampler = SequentialSampler(val_dataset)
+    # test_sampler = SequentialSampler(test_dataset)
 
     train_loader = DataLoader(
         train_dataset,
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         num_workers=8,
         pin_memory=(torch.cuda.is_available()),
         drop_last=False,
-        sampler=train_sampler
+        # sampler=train_sampler
     )
 
     val_loader = DataLoader(
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         shuffle=False,
         pin_memory=(torch.cuda.is_available()),
         drop_last=False,
-        sampler=val_sampler
+        # sampler=val_sampler
     )
 
     test_loader = DataLoader(
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         shuffle=False,
         pin_memory=(torch.cuda.is_available()),
         drop_last=False,
-        sampler=test_sampler
+        # sampler=test_sampler
     )
 
     print('\nLoading data time: {:.2f}s\n-----------------------------------------\n'.format(
@@ -163,6 +163,8 @@ if __name__ == "__main__":
                 reversed_loss = torch.tensor([0.], device=args.device)
                 preference_loss = torch.tensor([0.], device=args.device)
 
+                CEloss = normal_loss.item()
+
                 if mlp_reversed_out is not None:
                     reversed_loss = criterion(
                         mlp_reversed_out, abs(labels - 1).long().to(args.device))
@@ -211,8 +213,8 @@ if __name__ == "__main__":
 
                 print_step = 10
                 if step % print_step == 0:
-                    print('\n\nEpoch: {}, Step: {}, loss = {:.4f}'.format(
-                        epoch, step, loss.item()))
+                    print('\n\nEpoch: {}, Step: {}, CEloss = {:.4f}'.format(
+                        epoch, step, CEloss))
                     print('normal_loss = {:.4f}, reversed_loss = {:.4f}, preference_loss = {:.4f}\n'.format(
                         normal_loss.item(), reversed_loss.item(), preference_loss.item()))
 
@@ -220,10 +222,11 @@ if __name__ == "__main__":
                         print('event_loss = {:.4f}, reversed_event_loss = {:.4f}'.format(
                             normal_event_loss.item(), reversed_event_loss.item()))
 
-                    # print('mlp_out: ', mlp_out)
+                    print('mlp_out: ', mlp_out)
                     # print('mlp_reversed_out:, ', mlp_reversed_out)
-                    # print('map_entity[0][:20] = ', map_entity[0][:20])
-                    # print('map_pattern[0][:20] = ', map_pattern[0][:20])
+                    if map_entity is not None:
+                        print('map_entity[0][:20] = ', map_entity[0][:20])
+                        print('map_pattern[0][:20] = ', map_pattern[0][:20])
                     print()
 
             if args.fp16:

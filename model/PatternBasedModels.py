@@ -48,12 +48,8 @@ class BERT_Emo(nn.Module):
 
         self.args = args
 
-        if args.dataset in DATASETS_CHINESE:
-            self.bert = BertModel.from_pretrained(
-                args.bert_pretrained_model_chinese, return_dict=False)
-        else:
-            self.bert = BertModel.from_pretrained(
-                args.bert_pretrained_model_english, return_dict=False)
+        self.bert = BertModel.from_pretrained(
+            args.bert_pretrained_model, return_dict=False)
 
         for name, param in self.bert.named_parameters():
             # finetune the pooler layer
@@ -87,7 +83,7 @@ class BERT_Emo(nn.Module):
             len(fixed_layers), len(self.bert.state_dict()), fixed_layers))
         print('\n', '*'*15, '\n')
 
-        # reserve for "words" -> "tokens"
+        # transfer the "words"(nodes) to "characters"
         self.maxlen = min(int(args.bert_input_max_sequence_length * 1.5), 512)
         self.doc_maxlen = self.maxlen - 2
 
@@ -96,24 +92,24 @@ class BERT_Emo(nn.Module):
                             args.output_dim_of_pattern_based_model)
 
     def forward(self, idxs, dataset, tokens_features, maps=None):
-        # nodes_tokens:
-        #   each item, just like: [[2544, 1300], [2571, 45, 300], ...]
         # maps:
-        #   each item, just like: torch.tensor([0.02, 0.15, ...])
+        #   (batch_size, max_nodes) or None
+        # nodes_tokens:
+        #   List. Each item is just like: [[2544, 1300], [2571, 45, 300], ...]
 
-        # t = time.time()
         nodes_tokens = [dataset.graphs[idx.item()]['graph'] for idx in idxs]
-        nodes_tokens = [[n[-1] for n in nodes[:MAX_TOKENS_OF_A_POST]]
+        nodes_tokens = [[n[-1] for n in nodes[:self.args.bert_input_max_sequence_length]]
                         for nodes in nodes_tokens]
-        # print('Loading tokens from graph.json, it took {:.2f}s'.format(
-        #     time.time()-t))
 
-        t = time.time()
         if maps is not None:
-            tokened_maps = []
+            # ====== Transfer word-level map to token-level map ======
+
+            # (batch_size, max_len)
+            tokened_maps = torch.zeros(
+                len(maps), self.maxlen, device=self.args.device, dtype=torch.float)
+
             for i, nodes in enumerate(nodes_tokens):
                 m = maps[i]
-                assert len(nodes) == len(m)
 
                 # [[0.01, 0.01], [0.05, 0.05, 0.05], ...]
                 tokened_m = [[m[nidx]/len(node) for _ in node]
@@ -121,12 +117,9 @@ class BERT_Emo(nn.Module):
                 # [0.01, 0.01, 0.05, 0.05, 0.05, ...]
                 tokened_m = [a for b in tokened_m for a in b]
 
-                tokened_maps.append(torch.tensor(
-                    tokened_m, device=self.args.device))
+                sz = min(self.maxlen, len(tokened_m))
+                tokened_maps[i, :sz] = tokened_m[:sz]
 
-            # print('Transfer word-level map to token-level map, it took {:.2f}s'.format(
-            #     time.time()-t))
-            # t = time.time()
         else:
             tokened_maps = None
 
@@ -134,13 +127,7 @@ class BERT_Emo(nn.Module):
         nodes_tokens = [[a for b in nodes for a in b]
                         for nodes in nodes_tokens]
 
-        # print('nodes_tokens: ', nodes_tokens[0])
-        # print('maps: ', maps)
-        # print('tokened_maps: ', tokened_maps)
-
-        t = time.time()
         out = self.forward_BERT(idxs, dataset, nodes_tokens, maps=tokened_maps)
-        # print('In forward_BERT(), it took {:.2f}'.format(time.time() - t))
         return out
 
     def forward_BERT(self, idxs, dataset, tokens, maps=None):
@@ -156,12 +143,9 @@ class BERT_Emo(nn.Module):
         seq_output, _ = self.bert(input_ids)
 
         if maps is None:
-            # semantic_output = torch.mean(seq_output, dim=1)
             semantic_output = torch.sum(masks*seq_output, dim=1)
         else:
-            # (batch_size, max_sequence_length, 1)
-            maps_attention = self._padding([m[:, None] for m in maps])
-            semantic_output = torch.sum(maps_attention * seq_output, dim=1)
+            semantic_output = torch.sum(maps[:, :, None] * seq_output, dim=1)
 
         # emotion features
         if self.args.bert_emotion_dim > 0:
@@ -175,8 +159,7 @@ class BERT_Emo(nn.Module):
             # (batch_size, 768)
             output = semantic_output
 
-        # out = self.fc(output)
-        out = F.gelu(self.fc(output))
+        out = self.fc(output)
         return out
 
     def _encode(self, doc):
@@ -190,21 +173,6 @@ class BERT_Emo(nn.Module):
         mask[:-padding_length] = 1 / (len(doc) + 2)
 
         return input_ids, mask
-
-    def _padding(self, t):
-        # t:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, dim) tensor.
-        # Return:
-        #   a (batch_size, max_sequence_length, dim) tensor
-
-        dim = t[0].shape[-1]
-        padded_t = torch.zeros(
-            (len(t), self.maxlen, dim), device=self.args.device)
-        for i, x in enumerate(t):
-            sz = min(len(x), self.maxlen)
-            padded_t[i, :sz] = x[:sz]
-
-        return padded_t
 
 
 class EANN_Text(nn.Module):
