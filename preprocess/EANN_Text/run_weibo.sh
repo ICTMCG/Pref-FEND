@@ -1,1 +1,0 @@
-python events_clustering.py --dataset 'Weibo' --events_num 300

@@ -25,9 +25,8 @@ eann_input_dim	768
 eann_hidden_dim	64
 eann_event_num	300
 eann_use_textcnn	True
-eann_weight_of_event_loss	-1.0
-bert_pretrained_model_chinese	bert-base-chinese
-bert_pretrained_model_english	bert-base-uncased
+eann_weight_of_event_loss	1.0
+bert_pretrained_model	None
 bert_input_max_sequence_length	100
 bert_training_embedding_layers	True
 bert_training_inter_layers	True
@@ -54,7 +53,7 @@ declare_hidden_dim	128
 declare_max_doc_length	200
 declare_bilstm_num_layer	1
 declare_bilstm_dropout	0
-lr	5e-05
+lr	0.0001
 epochs	50
 batch_size	4
 start_epoch	0

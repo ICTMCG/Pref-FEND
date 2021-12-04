@@ -118,7 +118,8 @@ class BERT_Emo(nn.Module):
                 tokened_m = [a for b in tokened_m for a in b]
 
                 sz = min(self.maxlen, len(tokened_m))
-                tokened_maps[i, :sz] = tokened_m[:sz]
+                tokened_maps[i, :sz] = torch.as_tensor(
+                    tokened_m[:sz], device=self.args.device, dtype=torch.float)
 
         else:
             tokened_maps = None

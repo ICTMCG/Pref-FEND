@@ -1,4 +1,5 @@
 import torch
+from torch._C import device
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -53,14 +54,14 @@ class BaseDetector(nn.Module):
         return queries_features, queries_mask, articles_features, articles_mask, articles_num_mask
 
 
-class MAC(nn.Module):
+class MAC(BaseDetector):
     '''Hierarchical Multi-head Attentive Network for Evidence-aware Fake News Detection. EACL 2021.'''
     """
         Refer to https://github.com/nguyenvo09/EACL2021/blob/9d04d8954c1ded2110daac23117de11221f08cc6/Models/FCWithEvidences/hierachical_multihead_attention.py
     """
 
     def __init__(self, args):
-        super(MAC, self).__init__()
+        super(MAC, self).__init__(args)
         self.args = args
 
         self.max_sequence_length = args.mac_input_max_sequence_length
@@ -88,99 +89,41 @@ class MAC(nn.Module):
             (1 + self.num_heads_1 * self.num_heads_2)
         self.W5 = nn.Linear(
             last_output_dim, args.output_dim_of_fact_based_model, bias=True)
-        # self.W6 = nn.Linear(self.hidden_size, 1, bias=True)
-
-        self.doc_features_dropout = nn.Dropout(0.5)
 
     def forward(self, idxs, dataset, tokens_features, maps=None):
-        # tokens_features:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, input_dim) tensor.
-        # maps:
-        #   type is list (or None), the size is batch_size. Each elem is a (num_tokens) tensor.
+        # queries_features: (batch_size, max_nodes, 768)
+        # queries_mask: (batch_size, max_nodes)
+        # maps: (batch_size, max_nodes) or None
+        # articles_features: (batch_size, #doc, max_doc_len, 768)
+        # articles_mask: (batch_size, #doc, max_doc_len)
+        # articles_num_mask: (batch_size, #doc)
 
-        # === Get Top Articles Features ===
-
-        # (batch_size, MAX_RELEVANT_ARTICLES)
-        top_articles_idxs = dataset.top_articles_idxs[idxs]
-        # print('top_articles_idxs: ', top_articles_idxs)
-
-        # (batch_size, MAX_RELEVANT_ARTICLES, MAX_TOKENS_OF_A_DOC, 768)
-        articles_features = torch.zeros(
-            top_articles_idxs.shape[0], top_articles_idxs.shape[1], self.args.mac_max_doc_length, self.input_dim)
-        # (batch_size, MAX_RELEVANT_ARTICLES, MAX_TOKENS_OF_A_DOC)
-        articles_mask = torch.zeros_like(articles_features[:, :, :, 0])
-
-        for i, articles_idxs in enumerate(top_articles_idxs):
-            for j, article_idx in enumerate(articles_idxs):
-                # (num_tokens, 768)
-                feat = dataset.articles_features[article_idx]
-                sz = min(len(feat), self.args.mac_max_doc_length)
-
-                articles_features[i, j, :sz, :] = feat[:sz]
-                articles_mask[i, j, :sz] = 1
-
-        # Use all relevant articles: (batch_size, MAX_RELEVANT_ARTICLES)
-        articles_num_mask = torch.ones_like(articles_mask[:, :, 0])
-
-        # === Get Post Features & Maps ===
-        queries_features, queries_mask = self._padding(tokens_features)
-        if maps is not None:
-            maps, _ = self._padding([m[:, None] for m in maps])
-
-        articles_features = articles_features.to(self.args.device)
-        articles_mask = articles_mask.to(self.args.device)
-        articles_num_mask = articles_num_mask.to(self.args.device)
-
-        return self.forward_MAC(queries_features, queries_mask, articles_features, articles_mask, articles_num_mask, maps=maps)
-
-    def _padding(self, t):
-        # t:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, dim) tensor.
-        # Return:
-        #   padded_t: a (batch_size, max_sequence_length, dim) tensor
-        #   mask: a (batch_size, max_sequence_legnth) tensor
-
-        dim = t[0].shape[-1]
-        padded_t = torch.zeros(
-            (len(t), self.max_sequence_length, dim), device=self.args.device)
-        mask = torch.zeros_like(padded_t[:, :, 0])
-
-        for i, x in enumerate(t):
-            sz = min(len(x), self.max_sequence_length)
-            padded_t[i, :sz] = x[:sz]
-            mask[i, :sz] = 1
-        return padded_t, mask
-
-    def forward_MAC(self, query_feature, query_mask, doc_features, doc_mask, doc_num_mask, maps=None):
-        # query_feature -> [batch_size, post_len(padded), embedding_size]
-        # query_mask -> [batch_size, post_len(padded)]
-        # doc_features -> [batch_size, #doc, doc_len(padded), embedding_size]
-        # doc_mask -> [batch_size, #doc, doc_len(padded)]
-        # doc_num_mask -> [batch_size, #doc]
+        queries_features, queries_mask, articles_features, articles_mask, articles_num_mask = self.init_fact_based_detector_input(
+            idxs, dataset, tokens_features)
 
         # [batch_size, post_len, hidden_size * 2]
-        query_hiddens, _ = self.query_bilstm(query_feature)
+        query_hiddens, _ = self.query_bilstm(queries_features)
         query_hiddens = query_hiddens.masked_fill(
-            (query_mask[:, :, None] == 0), 0)
+            (queries_mask[:, :, None] == 0), 0)
 
         if maps is None:
             # [batch_size, hidden_size * 2] Eq.(1)
-            query_repr = torch.sum(query_hiddens, dim=1) / \
-                torch.sum(query_mask+ZERO, dim=1, keepdim=True)
+            query_repr = torch.sum(
+                query_hiddens * queries_mask[:, :, None], dim=-2)
         else:
-            query_repr = torch.sum(query_hiddens * maps, dim=1)
+            query_repr = torch.sum(query_hiddens * maps[:, :, None], dim=-2)
 
         # TimeDistributed(BiLSTM)
-        df_sizes = doc_features.size()
+        df_sizes = articles_features.size()
         # [batch_size * #doc, doc_len, emb_dim]
-        doc_hiddens = doc_features.view(-1, df_sizes[-2], df_sizes[-1])
+        doc_hiddens = articles_features.view(-1, df_sizes[-2], df_sizes[-1])
         # [batch_size * #doc, doc_len, hidden_size * 2]
         doc_hiddens = self.doc_bilstm(doc_hiddens)[0]
         # [batch_size, #doc, doc_len, hidden_size * 2]
         doc_hiddens = doc_hiddens.view(
             df_sizes[0], df_sizes[1], df_sizes[2], doc_hiddens.size()[-1])
 
-        doc_hiddens = self.doc_features_dropout(doc_hiddens)
+        # doc_hiddens = self.doc_features_dropout(doc_hiddens)
 
         # Multi-head Word Attention Layer
         C1 = query_repr.unsqueeze(1).unsqueeze(1).repeat(
@@ -192,7 +135,7 @@ class MAC(nn.Module):
 
         # exclude the padding words in each doc
         A1 = F.softmax(A1, dim=-1)  # [batch_size, #doc, doc_len, head_num_1]
-        A1 = A1.masked_fill((doc_mask[:, :, :, None] == 0), 0)
+        A1 = A1.masked_fill((articles_mask[:, :, :, None] == 0), 0)
 
         # [batch_size * #doc, doc_len, head_num_1]
         A1_tmp = A1.reshape(-1, A1.shape[-2], A1.shape[-1])
@@ -225,15 +168,14 @@ class MAC(nn.Module):
         # [batch_size, output_dim]
         final_features = self.W5(final_features)
 
-        final_features = F.gelu(final_features)
         return final_features
 
 
-class EVIN(nn.Module):
+class EVIN(BaseDetector):
     '''Evidence Inference Networks for Interpretable Claim Verification. AAAI 2021.'''
 
     def __init__(self, args):
-        super(EVIN, self).__init__()
+        super(EVIN, self).__init__(args)
         self.args = args
 
         self.max_sequence_length = args.evin_input_max_sequence_length
@@ -268,121 +210,77 @@ class EVIN(nn.Module):
         self.fc = nn.Linear(4 * self.output_dim,
                             self.args.output_dim_of_fact_based_model, bias=True)
 
-        # self.doc_features_dropout = nn.Dropout(0.5)
-
-    def forward(self, idxs, dataset, tokens_features, maps=None):
-        # tokens_features:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, input_dim) tensor.
-        # maps:
-        #   type is list (or None), the size is batch_size. Each elem is a (num_tokens) tensor.
-
-        # === Get Top Articles Features ===
-
+    def get_articles_all_features(self, idxs, dataset):
         # (batch_size, MAX_RELEVANT_ARTICLES)
         top_articles_idxs = dataset.top_articles_idxs[idxs]
-        # print('top_articles_idxs: ', top_articles_idxs)
 
-        # (batch_size, MAX_RELEVANT_ARTICLES, MAX_TOKENS_OF_A_DOC, 768)
-        articles_features = torch.zeros(
-            top_articles_idxs.shape[0], top_articles_idxs.shape[1], self.args.evin_max_doc_length, self.input_dim)
-        # (batch_size, MAX_RELEVANT_ARTICLES, MAX_TOKENS_OF_A_DOC)
-        articles_mask = torch.zeros_like(articles_features[:, :, :, 0])
-
-        # (batch_size, MAX_TOKENS_OF_A_DOC, 768)
+        # (batch_size, post_len, 768)
         articles_all_features = torch.zeros(
-            top_articles_idxs.shape[0], self.args.evin_max_doc_length, self.input_dim)
-        # (batch_size, MAX_TOKENS_OF_A_DOC)
-        articles_all_mask = torch.zeros_like(articles_all_features[:, :, 0])
+            top_articles_idxs.shape[0], self.max_sequence_length, self.input_dim, device=self.args.device)
+        # (batch_size, post_len)
+        articles_all_mask = torch.zeros_like(
+            articles_all_features[:, :, 0], device=self.args.device)
 
         for i, articles_idxs in enumerate(top_articles_idxs):
             curr = 0
             for j, article_idx in enumerate(articles_idxs):
                 # (num_tokens, 768)
                 feat = dataset.articles_features[article_idx]
-                sz = min(len(feat), self.args.evin_max_doc_length)
-
-                articles_features[i, j, :sz, :] = feat[:sz]
-                articles_mask[i, j, :sz] = 1
 
                 sz = min(len(feat), int(
-                    self.args.evin_max_doc_length / top_articles_idxs.shape[1]))
+                    self.max_sequence_length / top_articles_idxs.shape[1]))
                 articles_all_features[i, curr:curr+sz, :] = feat[:sz]
                 articles_all_mask[i, curr:curr+sz] = 1
                 curr += sz
 
-        # Use all relevant articles: (batch_size, MAX_RELEVANT_ARTICLES)
-        articles_num_mask = torch.ones_like(articles_mask[:, :, 0])
+        return articles_all_features, articles_all_mask
 
-        # === Get Post Features & Maps ===
-        queries_features, queries_mask = self._padding(tokens_features)
-        if maps is not None:
-            maps, _ = self._padding([m[:, None] for m in maps])
+    def forward(self, idxs, dataset, tokens_features, maps=None):
+        # queries_features: (batch_size, max_nodes, 768)
+        # queries_mask: (batch_size, max_nodes)
+        # maps: (batch_size, max_nodes) or None
+        # articles_features: (batch_size, #doc, max_doc_len, 768)
+        # articles_mask: (batch_size, #doc, max_doc_len)
+        # articles_num_mask: (batch_size, #doc)
+        # articles_all_features: (batch_size, max_nodes, 768)
+        # articles_all_mask: (batch_size, max_nodes)
 
-        articles_features = articles_features.to(self.args.device)
-        articles_mask = articles_mask.to(self.args.device)
-        articles_num_mask = articles_num_mask.to(self.args.device)
-        articles_all_features = articles_all_features.to(self.args.device)
-        articles_all_mask = articles_all_mask.to(self.args.device)
-
-        return self.forward_EVIN(queries_features, queries_mask, articles_features, articles_mask, articles_num_mask, articles_all_features, articles_all_mask, maps=maps)
-
-    def _padding(self, t):
-        # t:
-        #   type is list, the size is batch_size. Each elem is a (num_tokens, dim) tensor.
-        # Return:
-        #   padded_t: a (batch_size, max_sequence_length, dim) tensor
-        #   mask: a (batch_size, max_sequence_legnth) tensor
-
-        dim = t[0].shape[-1]
-        padded_t = torch.zeros(
-            (len(t), self.max_sequence_length, dim), device=self.args.device)
-        mask = torch.zeros_like(padded_t[:, :, 0])
-
-        for i, x in enumerate(t):
-            sz = min(len(x), self.max_sequence_length)
-            padded_t[i, :sz] = x[:sz]
-            mask[i, :sz] = 1
-
-        return padded_t, mask
-
-    def forward_EVIN(self, query_feature, query_mask, doc_features, doc_mask, doc_num_mask, doc_all_features, doc_all_mask, maps=None):
-        # query_feature -> [batch_size, post_len(padded), embedding_size]
-        # query_mask -> [batch_size, post_len(padded)]
-        # doc_features -> [batch_size, #doc, doc_len(padded), embedding_size]
-        # doc_mask -> [batch_size, #doc, doc_len(padded)]
-        # doc_num_mask -> [batch_size, #doc]
-        # doc_all_features -> [batch_size, docs_len(padded), embedding_size]
-        # doc_all_mask -> [batch_size, docs_len(padded)]
+        queries_features, queries_mask, articles_features, articles_mask, articles_num_mask = self.init_fact_based_detector_input(
+            idxs, dataset, tokens_features)
+        articles_all_features, articles_all_mask = self.get_articles_all_features(
+            idxs, dataset)
 
         # Input Encoding Layer
         # [batch_size, post_len, hidden_size * 2]
-        ec, _ = self.query_bilstm(query_feature)
-        # [batch_size, docs_len, hidden_size * 2]
-        erall, _ = self.doc_all_bilstm(doc_all_features)
+        ec, _ = self.query_bilstm(queries_features)
+        # [batch_size, post_len, hidden_size * 2]
+        erall, _ = self.doc_all_bilstm(articles_all_features)
 
         # TimeDistributed(BiLSTM)
-        df_sizes = doc_features.size()
+        df_sizes = articles_features.size()
         # [batch_size * #doc, doc_len, emb_dim]
-        er = doc_features.view(-1, df_sizes[-2], df_sizes[-1])
+        er = articles_features.view(-1, df_sizes[-2], df_sizes[-1])
         # [batch_size * #doc, doc_len, hidden_size * 2]
-        er = self.doc_single_bilstm(er)[0]
+        er, _ = self.doc_single_bilstm(er)
         # [batch_size, #doc, doc_len, hidden_size * 2]
-        er = er.view(df_sizes[0], df_sizes[1], df_sizes[2], er.size()[-1])
+        er = er.view(df_sizes[0], df_sizes[1], df_sizes[2], er.size(-1))
 
         # er = self.doc_features_dropout(er)
 
         # Co-interactive Shared Layer
+        if maps is not None:
+            queries_mask = maps
         # [batch_size, docs_len, hidden_size * 2]
-        Hs = self.mhatt(erall, ec, ec, doc_all_mask, query_mask)
+        Hs = self.mhatt(erall, ec, ec, articles_all_mask, queries_mask)
         Hsc = self.G1(ec, Hs)  # [batch_size, post_len, hidden_size * 2]
-        Hsr = self.G2(erall, Hs)  # [batch_size, docs_len, hidden_size * 2]
+        Hsr = self.G2(erall, Hs)  # [batch_size, post_len, hidden_size * 2]
 
         # Fine-grained Conflict Discovery Layer
         docs = er.size(1)
         Hsr_tmp = Hsr.repeat(docs, 1, 1)
         er_tmp = er.view(-1, er.size(-2), er.size(-1))
-        doc_all_mask_tmp = doc_all_mask.repeat(docs, 1)
-        doc_mask_tmp = doc_mask.view(-1, doc_mask.size(-1))
+        doc_all_mask_tmp = articles_all_mask.repeat(docs, 1)
+        doc_mask_tmp = articles_mask.view(-1, articles_mask.size(-1))
         # [batch_size * #doc, docs_len, hidden_size * 2]
         Hclf_tmp = self._single_head_att(
             Hsr_tmp, er_tmp, er_tmp, doc_all_mask_tmp, doc_mask_tmp)
@@ -582,9 +480,9 @@ class DeClarE(BaseDetector):
         self.num_layers = args.declare_bilstm_num_layer
 
         self.post_bilstm = nn.LSTM(self.input_dim, self.hidden_size, self.num_layers,
-                              bidirectional=True, batch_first=True, dropout=args.declare_bilstm_dropout)
+                                   bidirectional=True, batch_first=True, dropout=args.declare_bilstm_dropout)
         self.articles_bilstm = nn.LSTM(self.input_dim, self.hidden_size, self.num_layers,
-                              bidirectional=True, batch_first=True, dropout=args.declare_bilstm_dropout)
+                                       bidirectional=True, batch_first=True, dropout=args.declare_bilstm_dropout)
 
         self.Wa = nn.Linear(4 * self.hidden_size, 1, bias=True)
         self.Wc = nn.Linear(2 * self.hidden_size, 2 *
@@ -604,14 +502,15 @@ class DeClarE(BaseDetector):
         queries_features, queries_mask, articles_features, articles_mask, articles_num_mask = self.init_fact_based_detector_input(
             idxs, dataset, tokens_features)
 
-        # ========= Claim(Post) Specific Attention ========= 
+        # ========= Claim(Post) Specific Attention =========
         # (batch_size, max_nodes, hidden_size * 2)
         hq, _ = self.post_bilstm(queries_features)
         hq = hq.masked_fill((queries_mask[:, :, None] == 0), 0)
 
         if maps is None:
             # (batch_size, 1, hidden_size * 2)
-            pbar = torch.sum(queries_mask[:, :, None] * hq, dim=1, keepdim=True)
+            pbar = torch.sum(
+                queries_mask[:, :, None] * hq, dim=1, keepdim=True)
         else:
             pbar = torch.sum(maps[:, :, None] * hq, dim=1, keepdim=True)
 

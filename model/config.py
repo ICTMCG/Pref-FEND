@@ -96,6 +96,28 @@ parser.add_argument('--bert_hidden_dim', type=int, default=768)
 
 # ======================== Fact-based Models ========================
 
+# --- DeClarE ---
+parser.add_argument('--declare_input_max_sequence_length',
+                    type=int, default=MAX_TOKENS_OF_A_POST)
+parser.add_argument('--declare_input_dim', type=int, default=768)
+parser.add_argument('--declare_hidden_dim', type=int, default=128)
+parser.add_argument('--declare_max_doc_length', type=int,
+                    default=MAX_TOKENS_OF_A_DOC)
+parser.add_argument('--declare_bilstm_num_layer', type=float, default=1)
+parser.add_argument('--declare_bilstm_dropout', type=float, default=0)
+
+# --- EVIN ---
+parser.add_argument('--evin_input_max_sequence_length',
+                    type=int, default=MAX_TOKENS_OF_A_POST)
+parser.add_argument('--evin_max_doc_length', type=int,
+                    default=MAX_TOKENS_OF_A_DOC)
+parser.add_argument('--evin_input_dim', type=int, default=768)
+parser.add_argument('--evin_hidden_dim', type=int,
+                    default=60, help='hidden_dim * 2 % nhead = 0')
+parser.add_argument('--evin_dropout_att', type=float, default=0.5)
+parser.add_argument('--evin_dropout_mlp', type=float, default=0.6)
+parser.add_argument('--evin_nhead', type=int, default=6)
+
 # --- MAC ---
 parser.add_argument('--mac_input_max_sequence_length',
                     type=int, default=MAX_TOKENS_OF_A_POST)
@@ -107,28 +129,6 @@ parser.add_argument('--mac_dropout_doc', type=float, default=0)
 parser.add_argument('--mac_dropout_query', type=float, default=0)
 parser.add_argument('--mac_nhead_1', type=int, default=5)
 parser.add_argument('--mac_nhead_2', type=int, default=2)
-
-# --- EVIN ---
-parser.add_argument('--evin_input_max_sequence_length',
-                    type=int, default=MAX_TOKENS_OF_A_DOC)
-parser.add_argument('--evin_max_doc_length', type=int,
-                    default=MAX_TOKENS_OF_A_DOC)
-parser.add_argument('--evin_input_dim', type=int, default=768)
-parser.add_argument('--evin_hidden_dim', type=int,
-                    default=60, help='hidden_dim * 2 % nhead = 0')
-parser.add_argument('--evin_dropout_att', type=float, default=0.5)
-parser.add_argument('--evin_dropout_mlp', type=float, default=0.6)
-parser.add_argument('--evin_nhead', type=int, default=6)
-
-# --- DeClarE ---
-parser.add_argument('--declare_input_max_sequence_length',
-                    type=int, default=MAX_TOKENS_OF_A_POST)
-parser.add_argument('--declare_input_dim', type=int, default=768)
-parser.add_argument('--declare_hidden_dim', type=int, default=128)
-parser.add_argument('--declare_max_doc_length', type=int,
-                    default=MAX_TOKENS_OF_A_DOC)
-parser.add_argument('--declare_bilstm_num_layer', type=float, default=1)
-parser.add_argument('--declare_bilstm_dropout', type=float, default=0)
 
 # ======================== Training ========================
 

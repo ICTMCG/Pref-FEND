@@ -1,7 +1,7 @@
 dataset	Weibo
 category_num	2
-save	ckpts/BERT_Emo
-use_preference_map	False
+save	ckpts/BERT_Emo_with_Pref-FENDs
+use_preference_map	True
 use_pattern_based_model	True
 use_fact_based_model	False
 num_gnn_layers	2
@@ -12,9 +12,9 @@ fact_based_model
 output_dim_of_pattern_based_model	256
 output_dim_of_fact_based_model	0
 num_mlp_layers	3
-weight_of_normal_loss	1.0
-weight_of_preference_loss	0.0
-weight_of_reversed_loss	0.0
+weight_of_normal_loss	2.0
+weight_of_preference_loss	1.0
+weight_of_reversed_loss	1.0
 bilstm_input_max_sequence_length	100
 bilstm_input_dim	768
 bilstm_hidden_dim	128
@@ -363,6 +363,29 @@ PrefFEND(
     (fc): Linear(in_features=823, out_features=256, bias=True)
   )
   (fcs): ModuleList(
+    (0): Linear(in_features=256, out_features=128, bias=True)
+    (1): Linear(in_features=128, out_features=64, bias=True)
+    (2): Linear(in_features=64, out_features=2, bias=True)
+  )
+  (HetDGCN): HetDGCN(
+    (gnn_layers): ModuleList(
+      (0): ModuleDict(
+        (ENTITY): GCNConv(768, 768)
+        (OTHERS): GCNConv(768, 768)
+        (PATTERN): GCNConv(768, 768)
+      )
+      (1): ModuleDict(
+        (ENTITY): GCNConv(768, 768)
+        (OTHERS): GCNConv(768, 768)
+        (PATTERN): GCNConv(768, 768)
+      )
+    )
+    (gnn_dynamic_update_weights): ParameterList(
+        (0): Parameter containing: [torch.cuda.FloatTensor of size 768x768 (GPU 0)]
+        (1): Parameter containing: [torch.cuda.FloatTensor of size 768x768 (GPU 0)]
+    )
+  )
+  (reversed_fcs): ModuleList(
     (0): Linear(in_features=256, out_features=128, bias=True)
     (1): Linear(in_features=128, out_features=64, bias=True)
     (2): Linear(in_features=64, out_features=2, bias=True)

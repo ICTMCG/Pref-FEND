@@ -1,1 +1,0 @@
-python retrieve.py --dataset 'Weibo'

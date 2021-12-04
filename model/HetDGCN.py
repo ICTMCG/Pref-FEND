@@ -119,6 +119,12 @@ class HetDGCN(nn.Module):
 
             # (num, num)
             curr_A = A[curr:curr+num, curr:curr+num]
+
+            if torch.any(torch.isnan(curr_A)):
+                print()
+                print('curr_A: ', curr_A)
+                # exit()
+
             # (num)
             A_sum = torch.sum(curr_A, dim=1)
 

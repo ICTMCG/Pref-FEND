@@ -45,15 +45,15 @@ class GraphDataset(Dataset):
             self.init_articles_data(articles_tokens_file, bm25_results_file)
             print('Done, it took {:.2}s\n'.format(time.time() - t))
 
-        # === TODO: BERT_Emo ===
-        # if args.pattern_based_model == 'BERT_Emo' and args.bert_emotion_dim > 0:
-        #     t = time.time()
-        #     print('\nLoading Emotion data...')
-        #     emotion_features_file = os.path.join(
-        #         PROJECT_DIR, 'Baselines/BERT_Emo/code/preprocess/data', experimental_dataset, 'emotions/{}.npy'.format(dataset_type))
-        #     self.BERT_Emo_features = np.load(emotion_features_file)
-        #     print('Done, the shape is {}, it took {:.2}s\n'.format(
-        #         self.BERT_Emo_features.shape, time.time() - t))
+        # === BERT_Emo ===
+        if args.pattern_based_model == 'BERT_Emo' and args.bert_emotion_dim > 0:
+            t = time.time()
+            print('\nLoading Emotion data...')
+            emotion_features_file = '../preprocess/BERT_Emo/code/preprocess/data/{}/{}.npy'.format(
+                experimental_dataset, dataset_type)
+            self.BERT_Emo_features = np.load(emotion_features_file)
+            print('Done, the shape is {}, it took {:.2}s\n'.format(
+                self.BERT_Emo_features.shape, time.time() - t))
 
         # === EANN_Text ===
         if args.pattern_based_model == 'EANN_Text':

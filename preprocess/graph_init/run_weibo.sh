@@ -1,1 +1,0 @@
-python init_graph.py --dataset 'Weibo' --max_nodes 100
