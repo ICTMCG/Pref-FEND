@@ -1,9 +1,5 @@
 # Pref-FEND
 
-**[Notes]** The repo may be incomplete and some of the code is a bit messy. We will improve in the near future. Readme will also include more details. Coming soon stay tuned :)
-
----
-
 This is the official repository of the paper:
 
 > **Integrating Pattern- and Fact-based Fake News Detection via Model Preference Learning.**
